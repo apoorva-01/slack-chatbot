@@ -1,0 +1,38 @@
+# Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.env
+*.venv
+venv/
+ENV/
+env/
+*.egg-info/
+.eggs/
+
+# VSCode
+.vscode/
+
+# Logs
+*.log
+
+# FAISS Indexes and Pickle Files
+faiss_index/*.faiss
+faiss_index/*.pkl
+
+# Credentials and Sensitive Files
+.env
+*.json
+
+# Byte-compiled / optimized / DLL files
+*.py[cod]
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
