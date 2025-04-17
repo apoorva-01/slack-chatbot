@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from slack_sdk import WebClient
 from index_client_data import FAISSVectorStore
 from utils import (
+    classify_multiple_projects_query_intent,
     get_thread_metadata,
     store_thread_metadata,
     convert_to_slack_message,
@@ -42,31 +43,7 @@ slack_client = WebClient(token=SLACK_BOT_TOKEN)
 
 ASSISTANTS = [f.replace(".faiss", "") for f in os.listdir("faiss_index") if f.endswith(".faiss")]
 
-def classify_query_intent_with_gemini(user_query):
-    prompt = f"""
-    You are a classification assistant. Decide if the following user query is a filtering-based query.
 
-    Examples of filtering queries:
-    - Show only completed projects.
-    - List projects from last month.
-    - Filter projects by team member.
-    - Projects where status is 'In Progress'.
-
-    Examples of non-filtering queries:
-    - Summarize updates for this project.
-    - What are the key blockers for projects?
-    - How are clients responding?
-    - What’s the overall sentiment?
-
-    Query:
-    "{user_query}"
-
-    Is this query a filtering-based query? Answer with only 'Yes' or 'No'.
-    """
-
-    model = genai.GenerativeModel(model_name="gemini-2.0-flash")
-    response = model.generate_content(prompt)
-    return response.text.strip().lower().startswith("yes")
 
 def get_multiple_projects_from_thread_context(thread_context):
     try:
@@ -93,16 +70,13 @@ Output:
         result = model.generate_content(prompt)
 
         if result and hasattr(result, "text"):
-            print("Raw response:", result.text)
             try:
-                # Preprocess the response to ensure valid JSON
                 cleaned_response = result.text.strip()
                 if cleaned_response.startswith("```json"):
                     cleaned_response = cleaned_response[7:].strip()  # Remove ```json prefix
                 if cleaned_response.endswith("```"):
                     cleaned_response = cleaned_response[:-3].strip()  # Remove ``` suffix
 
-                # Parse the cleaned JSON response
                 project_names = json.loads(cleaned_response)
                 return project_names  # Return as a Python list
             except json.JSONDecodeError as e:
@@ -172,7 +146,7 @@ def generate_final_response(user_query, is_follow_up, thread_context, thread_mes
                 result = generate_custom_filter_response(user_query, notion_chunks)
             else:
                 # Follow-up → classify query intent
-                if classify_query_intent_with_gemini(user_query):
+                if classify_multiple_projects_query_intent(user_query):
                     print("🔎 Classified as filtering query")
                     result = generate_custom_filter_response(user_query, notion_chunks)
                 else:

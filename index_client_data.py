@@ -7,7 +7,7 @@ import json
 import numpy as np
 from datetime import datetime
 import google.generativeai as genai
-import google.api_core.exceptions  # Add this import
+import google.api_core.exceptions
 from dotenv import load_dotenv
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -286,7 +286,7 @@ class FAISSVectorStore:
         print(f"💾 FAISS index saved for {client_name}")
 
     def create_index(self, documents):
-        # self._clear_index_dir()
+        self._clear_index_dir()
         
         docs_by_client = self._organize_google_docs(documents)
         self._process_notion_documents(notion_documents)

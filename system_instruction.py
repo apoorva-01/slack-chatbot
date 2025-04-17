@@ -506,7 +506,7 @@ No matching projects found based on your query.
 
 #### If [FOLLOW_UP == True] and the user query is vague:
 - If `QUERY_TYPE = specific_project` ➝ Use `{project_name}`
-- If `QUERY_TYPE = multiple_projects` ➝ Use `{multiple_projects_array}` to infer project names
+- If `QUERY_TYPE = multiple_projects` ➝ Use Project Names in `{multiple_projects_array}` only to infer project names
 
 #### If [FOLLOW_UP == False] and the user query is vague:
 Ask for clarification:

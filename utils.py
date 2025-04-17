@@ -4,134 +4,52 @@ import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from slack_sdk.errors import SlackApiError
-from datetime import datetime
+# from datetime import datetime
 import threading
 from dotenv import load_dotenv
+import google.generativeai as genai
+from document_ids import (
+    ASSISTANT_SHEET_MAP
+)
 load_dotenv()
 SLACK_BOT_USER_ID = os.getenv("SLACK_BOT_USER_ID")
 GOOGLE_CREDENTIALS = os.getenv("GOOGLE_CREDENTIALS_JSON")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+genai.configure(api_key=GEMINI_API_KEY)
 # Thread-safe metadata storage
 thread_metadata = {}
 metadata_lock = threading.Lock()
 
 # Assistant mapping
-ASSISTANT_SHEET_MAP = {
-    "voluspa": "1WzUELoORjlIxjrb1JF2NHMIgvz73c0JIVlyjlRiAYl0",
-    "mymedic": "1ker4oEDAZZFnF_SKa2JSHckmo_MoETrjJIZnQ_gtlEk",
-    "manlyman": "1VkV6L_d5nNkDQ4V31RYxje9oZ-gpY8qoJS5lDDLWvqw",
-    "jdsports":"1ANAHcbGYdvWISMkdIj2XSgU2cuJIR6bNNbtFBopzuX4",
-    "malbongolf":"1yGm5XG-fLrxIDvYMIzcGk00vMAYO_MnKTuaPA04jLH4",
-    "marijuana-packaging":"1iVPTTcVmihizLIVqoI_Mn6LdI3Zi8-GZ6hoTm9LU5q8",
-    "taosfootwear":"1z3gL_3SZNm2EEsbedDzfuhxlsHTJ4A2zmSQ5slm6ovM",
-    "shepherdsfashion": "1p1pshD0I008Ke0bXtPa4dHCIixukJeywm9PRvla6rKE",
-    "goldenlions":"1_7bJPUMXLUhVMEjnulrWyFdALQXbm4upNPAlDCC0_Ak",
-    "fullglasswineco":"1R1n4xT4BO6Zx2-c42cnHQfO1cFAv1P0S31bICkx28Mw",
-    "duck-camp":"1UZ2MPVoYDQ8Jx3Qxa3nxYxPS14v67tvmxRN5cfqrxzA",
-    "emazing-group":"1zDd-9U2uSFTUSeJNm5ZfUeyU2IVrlwp0BpQ4X_HC4Jw",
-    "silverfernbrand":"1dUulMd2TxWAJSAL9K2AL3MJQa534TKMxuYaI7g1fXXI",
-    "darntough":"1zzHnNok6AmvRJR2vVRuidIX0fVWSa093t00heltmR-U",
-    "bartonwatches":"1bc7M-RbdabILwXDuWjXf0GORoYuP71xUXQlsLOIAdTU",
-    "hammitt":"1Ky2StPqtvMly83SinM0nfSUa8s3Yxli3RwSH2qTAyYM",
-    "dermdude":"13n-9ag7iDpkQT4D9NrJspePZwI1Y4FhFfmFkH5Dh6Lo",
-    "inprintwetrustt":"1mD878GLOljX0SSDxCVC0NlYFr5kk_NnkUwmJCeixjOg",
-    "florida-premium-beef":"1ZOxWDQylukRD7aLcGBorDNAflsc1eRRwYy63RxGVuII",
-    "warroad":"1_2H1j05PDUofYeQ1jESUh12QNlfeNo5MIYE3FMDLLhg",
-    "tailwind-nutrition":"19CrPSz1Edq8L4zfijO7_5XO64czVynj1UtD5hwPvKT4",
-    "printfresh":"1Bsn082-a8-QoLGF_32JPeg4IOB7i1XbbzXQUSvPSMGQ",
-    "mindbodygreen":"1HwVNSkrrLOkXnxRnT9E_FzRia3fd209itBoSW1ITYuU",
-    "shes-birdie":"1B0TZStoE7mN6sMyoHQQt6jy_DKALadxOqQQ3BG9bE6o",
-    "axeandsledge":"1M2pqk_0YN4OXgdkNnEqYTJAhDJjKyfM0_rS36RFMLls",
-    "heybud":"1qkIcxj7sYQE_8_YYATbuNKix2qrU-CV2DQ1lpM2jT8U",
-    "jones-road":"1ZK4F0CRKX8Ae0DsPBpUbiGdXbE-FNePYefw41N-ngJg",
-    "createroom":"1qtqe286-p4AluC_ytAIB-K29O3-r_4zVzhoOvTXMWq8",
-    "choczero":"1ZmCS7kLk7nNCJ4VVNEridof7Jb31I9uCHSBgcoPIZYY",
-    "seekinghealth":"1rkd-jdw9ywDAfS8_hfOw0Kb-g4lNRIbJ9z51JTkcZBY",
-    "chefiq":"1NRQWiOrkUybzHifhjV6-yysV5Ud4RhFLCqEu5QC-K50",
-    
-}
 
 
-def split_text_to_blocks(text, limit=3000):
-    # Safely split by line first
-    lines = text.split("\n")
-    blocks = []
-    current_block = ""
+def classify_multiple_projects_query_intent(user_query):
+    prompt = f"""
+    You are a classification assistant. Decide if the following user query is a filtering-based query.
 
-    for line in lines:
-        # +1 accounts for the newline character that will be added
-        if len(current_block) + len(line) + 1 < limit:
-            current_block += line + "\n"
-        else:
-            blocks.append({
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": current_block.strip()
-                }
-            })
-            blocks.append({"type": "divider"})  # Optional
-            current_block = line + "\n"
+    Examples of filtering queries:
+    - Show only completed projects.
+    - List projects from last month.
+    - Filter projects by team member.
+    - Projects where status is 'In Progress'.
 
-    if current_block:
-        blocks.append({
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": current_block.strip()
-            }
-        })
+    Examples of non-filtering queries:
+    - Summarize updates for this project.
+    - What are the key blockers for projects?
+    - How are clients responding?
+    - What’s the overall sentiment?
 
-    return blocks
+    Query:
+    "{user_query}"
 
-def convert_to_slack_message(markdown_text: str) -> str:
-    # Convert <br> to newline
-    markdown_text = markdown_text.replace('<br>', '\n')
-    # Convert custom bold: !!text!! → *text*
-    markdown_text = re.sub(r'!!(.*?)!!', r'*\1*', markdown_text)
-    
-    # Convert italic: __text__ → _text_
-    markdown_text = re.sub(r'__(.*?)__', r'_\1_', markdown_text)
-    
-    # Convert links: [text](url) → <url|text>
-    markdown_text = re.sub(r'\[(.*?)\]\((.*?)\)', r'<\2|\1>', markdown_text)
-    
-    # Convert dash bullets (- ) to numbered list: 1., 2., ...
-    lines = markdown_text.splitlines()
-    numbered_lines = []
-    counter = 1
-    for line in lines:
-        if re.match(r'^\s*-\s+', line):
-            content = re.sub(r'^\s*-\s+', '', line)
-            numbered_lines.append(f"{counter}. {content}")
-            counter += 1
-        else:
-            numbered_lines.append(line)
-    markdown_text = '\n'.join(numbered_lines)
-    
-    # Convert :: prefix to unstyled bullet → •
-    markdown_text = re.sub(r'^\s*::\s*(.*)', r'• \1', markdown_text, flags=re.MULTILINE)
-    
-    # Convert >> prefix to block quote → >
-    markdown_text = re.sub(r'^\s*>>\s*(.*)', r'> \1', markdown_text, flags=re.MULTILINE)
-    # return split_text_to_blocks(markdown_text)
-    return markdown_text
+    Is this query a filtering-based query? Answer with only 'Yes' or 'No'.
+    """
 
-def strip_json_wrapper(text):
-    # Remove code block wrappers like ```json or ```text
-    text = re.sub(r'^\s*```(?:json|text)?\s*', '', text.strip(), flags=re.IGNORECASE)
-    text = re.sub(r'\s*```$', '', text.strip())
-    # Remove Markdown bold (**text**)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    # If it's a single-field JSON string, extract the value (safely)
-    match = re.search(r':\s*"([^"]+)"', text)
-    if match:
-        return match.group(1)
-    # Remove leading 'json' or 'text' identifiers
-    text = re.sub(r"^(json|text)\s*", "", text.strip(), flags=re.IGNORECASE)
-    # Remove tool_code key/label if it's showing up
-    text = re.sub(r"(?i)^tool_code\s*[:=]\s*", "", text.strip())
+    model = genai.GenerativeModel(model_name="gemini-2.0-flash")
+    response = model.generate_content(prompt)
+    return response.text.strip().lower().startswith("yes")
 
-    return text.strip()
 
 def store_thread_metadata(thread_ts, metadata):
     """Safely stores metadata for a thread."""
@@ -185,88 +103,6 @@ def get_thread_messages(slack_client, channel, thread_ts):
         return []
     
 
-def preprocess_prompt_multiple_projects(prompt):
-    """Expands shorthand terms and handles date-related queries before sending to Gemini."""
-    month_mapping = {
-        "january": "01", "jan": "01",
-        "february": "02", "feb": "02",
-        "march": "03", "mar": "03",
-        "april": "04", "apr": "04",
-        "may": "05",
-        "june": "06", "jun": "06",
-        "july": "07", "jul": "07",
-        "august": "08", "aug": "08",
-        "september": "09", "sep": "09",
-        "october": "10", "oct": "10",
-        "november": "11", "nov": "11",
-        "december": "12", "dec": "12",
-    }
-
-    field_mapping = {
-        "created": "Created Time",
-        "creation": "Created Time",
-        "deployed": "Deployment Date",
-        "deployment": "Deployment Date",
-        "due": "Original Due Date",
-        "original due": "Original Due Date",
-        "dev hours": "Projected Dev Hours",
-        "qi hours": "Projected QI Hours",
-        "total hours": "Total Project Hours",
-    }
-
-    # Normalize markdown-like symbols (e.g., *Created*) to just Created
-    prompt = re.sub(r'\*(\w+)\*', r'\1', prompt)
-
-    # Regex pattern to detect "<field> in <month> <year>"
-    month_year_pattern = re.compile(
-        r'\b([a-zA-Z\s]+?)\s+in\s+('
-        r'jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|'
-        r'january|february|march|april|may|june|july|august|september|october|november|december'
-        r')\s+(\d{4})',
-        re.IGNORECASE
-    )
-
-    start_date = end_date = field_name = None
-
-    match = month_year_pattern.search(prompt)
-    if match:
-        field_raw, month_raw, year = match.groups()
-        field_key = field_raw.strip().lower()
-        month_key = month_raw.lower()
-        year = int(year)
-
-        month_num = month_mapping.get(month_key)
-
-        # Fix: Match best key from field_mapping
-        field_name = next(
-            (v for k, v in field_mapping.items() if k in field_key),
-            field_raw.strip()
-        )
-
-        if month_num:
-            # Calculate start and end dates
-            start_date_obj = datetime(year, int(month_num), 1).date()
-            if month_num in ["04", "06", "09", "11"]:
-                end_day = 30
-            elif month_num == "02":
-                end_day = 29 if year % 4 == 0 else 28
-            else:
-                end_day = 31
-            end_date_obj = datetime(year, int(month_num), end_day).date()
-
-            # Convert to string
-            start_date = start_date_obj.isoformat()
-            end_date = end_date_obj.isoformat()
-
-            date_filter = f"{field_name} between {start_date} and {end_date}"
-            prompt = month_year_pattern.sub(date_filter, prompt)
-
-    # Expand remaining field mappings in prompt
-    for short, full in field_mapping.items():
-        pattern = re.compile(rf'\b{re.escape(short)}\b', flags=re.IGNORECASE)
-        prompt = pattern.sub(full, prompt)
-
-    return prompt
 
 def find_relevant_project_name(query, project_names):
     """Finds the most relevant project name using keyword matching and fuzzy matching."""
@@ -448,3 +284,138 @@ def send_specefic_project_confirmation_button(slack_client, user_query, assistan
         print(f"❌ Slack API Error: {e.response['error']}")
         return None
 
+
+
+def convert_to_slack_message(markdown_text: str) -> str:
+    # Convert <br> to newline
+    markdown_text = markdown_text.replace('<br>', '\n')
+    # Convert custom bold: !!text!! → *text*
+    markdown_text = re.sub(r'!!(.*?)!!', r'*\1*', markdown_text)
+    
+    # Convert italic: __text__ → _text_
+    markdown_text = re.sub(r'__(.*?)__', r'_\1_', markdown_text)
+    
+    # Convert links: [text](url) → <url|text>
+    markdown_text = re.sub(r'\[(.*?)\]\((.*?)\)', r'<\2|\1>', markdown_text)
+    
+    # Convert dash bullets (- ) to numbered list: 1., 2., ...
+    lines = markdown_text.splitlines()
+    numbered_lines = []
+    counter = 1
+    for line in lines:
+        if re.match(r'^\s*-\s+', line):
+            content = re.sub(r'^\s*-\s+', '', line)
+            numbered_lines.append(f"{counter}. {content}")
+            counter += 1
+        else:
+            numbered_lines.append(line)
+    markdown_text = '\n'.join(numbered_lines)
+    
+    # Convert :: prefix to unstyled bullet → •
+    markdown_text = re.sub(r'^\s*::\s*(.*)', r'• \1', markdown_text, flags=re.MULTILINE)
+    
+    # Convert >> prefix to block quote → >
+    markdown_text = re.sub(r'^\s*>>\s*(.*)', r'> \1', markdown_text, flags=re.MULTILINE)
+    return markdown_text
+
+def strip_json_wrapper(text):
+    # Remove code block wrappers like ```json or ```text
+    text = re.sub(r'^\s*```(?:json|text)?\s*', '', text.strip(), flags=re.IGNORECASE)
+    text = re.sub(r'\s*```$', '', text.strip())
+    # Remove Markdown bold (**text**)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    # If it's a single-field JSON string, extract the value (safely)
+    match = re.search(r':\s*"([^"]+)"', text)
+    if match:
+        return match.group(1)
+    # Remove leading 'json' or 'text' identifiers
+    text = re.sub(r"^(json|text)\s*", "", text.strip(), flags=re.IGNORECASE)
+    # Remove tool_code key/label if it's showing up
+    text = re.sub(r"(?i)^tool_code\s*[:=]\s*", "", text.strip())
+
+    return text.strip()
+
+
+
+# def preprocess_prompt_multiple_projects(prompt):
+#     """Expands shorthand terms and handles date-related queries before sending to Gemini."""
+#     month_mapping = {
+#         "january": "01", "jan": "01",
+#         "february": "02", "feb": "02",
+#         "march": "03", "mar": "03",
+#         "april": "04", "apr": "04",
+#         "may": "05",
+#         "june": "06", "jun": "06",
+#         "july": "07", "jul": "07",
+#         "august": "08", "aug": "08",
+#         "september": "09", "sep": "09",
+#         "october": "10", "oct": "10",
+#         "november": "11", "nov": "11",
+#         "december": "12", "dec": "12",
+#     }
+
+#     field_mapping = {
+#         "created": "Created Time",
+#         "creation": "Created Time",
+#         "deployed": "Deployment Date",
+#         "deployment": "Deployment Date",
+#         "due": "Original Due Date",
+#         "original due": "Original Due Date",
+#         "dev hours": "Projected Dev Hours",
+#         "qi hours": "Projected QI Hours",
+#         "total hours": "Total Project Hours",
+#     }
+
+#     # Normalize markdown-like symbols (e.g., *Created*) to just Created
+#     prompt = re.sub(r'\*(\w+)\*', r'\1', prompt)
+
+#     # Regex pattern to detect "<field> in <month> <year>"
+#     month_year_pattern = re.compile(
+#         r'\b([a-zA-Z\s]+?)\s+in\s+('
+#         r'jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|'
+#         r'january|february|march|april|may|june|july|august|september|october|november|december'
+#         r')\s+(\d{4})',
+#         re.IGNORECASE
+#     )
+
+#     start_date = end_date = field_name = None
+
+#     match = month_year_pattern.search(prompt)
+#     if match:
+#         field_raw, month_raw, year = match.groups()
+#         field_key = field_raw.strip().lower()
+#         month_key = month_raw.lower()
+#         year = int(year)
+
+#         month_num = month_mapping.get(month_key)
+
+#         # Fix: Match best key from field_mapping
+#         field_name = next(
+#             (v for k, v in field_mapping.items() if k in field_key),
+#             field_raw.strip()
+#         )
+
+#         if month_num:
+#             # Calculate start and end dates
+#             start_date_obj = datetime(year, int(month_num), 1).date()
+#             if month_num in ["04", "06", "09", "11"]:
+#                 end_day = 30
+#             elif month_num == "02":
+#                 end_day = 29 if year % 4 == 0 else 28
+#             else:
+#                 end_day = 31
+#             end_date_obj = datetime(year, int(month_num), end_day).date()
+
+#             # Convert to string
+#             start_date = start_date_obj.isoformat()
+#             end_date = end_date_obj.isoformat()
+
+#             date_filter = f"{field_name} between {start_date} and {end_date}"
+#             prompt = month_year_pattern.sub(date_filter, prompt)
+
+#     # Expand remaining field mappings in prompt
+#     for short, full in field_mapping.items():
+#         pattern = re.compile(rf'\b{re.escape(short)}\b', flags=re.IGNORECASE)
+#         prompt = pattern.sub(full, prompt)
+
+#     return prompt
