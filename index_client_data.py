@@ -1,6 +1,5 @@
 import os
 import re
-import pandas as pd
 import re
 import faiss
 import pickle
@@ -331,11 +330,11 @@ class FAISSVectorStore:
                 print(f"⚠️ Empty notion document: {doc_id} ({client}) - Skipping.")
                 continue
             project_data = parse_project_data(text)
-            df = pd.DataFrame(project_data)  # Convert list of dictionaries to DataFrame
             file_path = os.path.join("faiss_index", f"{client}_notion.json")
-            # Save the DataFrame as a single JSON array
-            df.to_json(file_path, orient="records", lines=False, indent=4)  # Remove `lines=True`
-            print(f"DataFrame saved to {file_path}")
+            # Save the list of dictionaries as a JSON array
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(project_data, f, indent=4)
+            print(f"JSON data saved to {file_path}")
 
 
     def _process_special_documents(self, document_list, doc_type):
