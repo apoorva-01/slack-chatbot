@@ -4,52 +4,22 @@ import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from slack_sdk.errors import SlackApiError
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 # from datetime import datetime
 import threading
 from dotenv import load_dotenv
-import google.generativeai as genai
+
 from document_ids import (
     ASSISTANT_SHEET_MAP
 )
 load_dotenv()
 SLACK_BOT_USER_ID = os.getenv("SLACK_BOT_USER_ID")
 GOOGLE_CREDENTIALS = os.getenv("GOOGLE_CREDENTIALS_JSON")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-genai.configure(api_key=GEMINI_API_KEY)
 # Thread-safe metadata storage
 thread_metadata = {}
 metadata_lock = threading.Lock()
-
-# Assistant mapping
-
-
-def classify_multiple_projects_query_intent(user_query):
-    prompt = f"""
-    You are a classification assistant. Decide if the following user query is a filtering-based query.
-
-    Examples of filtering queries:
-    - Show only completed projects.
-    - List projects from last month.
-    - Filter projects by team member.
-    - Projects where status is 'In Progress'.
-
-    Examples of non-filtering queries:
-    - Summarize updates for this project.
-    - What are the key blockers for projects?
-    - How are clients responding?
-    - What’s the overall sentiment?
-
-    Query:
-    "{user_query}"
-
-    Is this query a filtering-based query? Answer with only 'Yes' or 'No'.
-    """
-
-    model = genai.GenerativeModel(model_name="gemini-2.0-flash")
-    response = model.generate_content(prompt)
-    return response.text.strip().lower().startswith("yes")
-
 
 def store_thread_metadata(thread_ts, metadata):
     """Safely stores metadata for a thread."""
@@ -336,6 +306,119 @@ def strip_json_wrapper(text):
     return text.strip()
 
 
+
+
+def preprocess_relative_dates(query):
+    today = datetime.today()
+
+    def format_date(date_obj):
+        return date_obj.strftime('%Y-%m-%d')
+
+    def month_range(date_obj):
+        start = date_obj.replace(day=1)
+        next_month = start + relativedelta(months=1)
+        end = next_month - timedelta(days=1)
+        return format_date(start), format_date(end)
+
+    def week_range(date_obj):
+        start = date_obj - timedelta(days=date_obj.weekday())
+        end = start + timedelta(days=6)
+        return format_date(start), format_date(end)
+
+    def year_range(date_obj):
+        start = date_obj.replace(month=1, day=1)
+        end = date_obj.replace(month=12, day=31)
+        return format_date(start), format_date(end)
+
+    def quarter_range(date_obj):
+        month = ((date_obj.month - 1) // 3) * 3 + 1
+        start = date_obj.replace(month=month, day=1)
+        end = (start + relativedelta(months=3)) - timedelta(days=1)
+        return format_date(start), format_date(end)
+
+    def shift_quarter(date_obj, shift):
+        month = ((date_obj.month - 1) // 3) * 3 + 1
+        current_q_start = date_obj.replace(month=month, day=1)
+        target_q_start = current_q_start + relativedelta(months=3*shift)
+        return quarter_range(target_q_start)
+
+    replacements = {
+        r"\btoday\b": format_date(today),
+        r"\byesterday\b": format_date(today - timedelta(days=1)),
+        r"\btomorrow\b": format_date(today + timedelta(days=1)),
+
+        # Weeks
+        r"\bthis week\b": f'in: {week_range(today)}',
+        r"\bnext week\b": f'in: {week_range(today + timedelta(days=7))}',
+        r"\blast week\b": f'in: {week_range(today - timedelta(days=7))}',
+        r"\bcoming week\b": f'in: {week_range(today + timedelta(days=7))}',
+        r"\bprevious week\b": f'in: {week_range(today - timedelta(days=7))}',
+
+        # Months
+        r"\bthis month\b": f'in: {month_range(today)}',
+        r"\bnext month\b": f'in: {month_range(today + relativedelta(months=1))}',
+        r"\blast month\b": f'in: {month_range(today - relativedelta(months=1))}',
+        r"\bcoming month\b": f'in: {month_range(today + relativedelta(months=1))}',
+        r"\bprevious month\b": f'in: {month_range(today - relativedelta(months=1))}',
+
+        # Years
+        r"\bthis year\b": f'in: {year_range(today)}',
+        r"\bthis yr\b": f'in: {year_range(today)}',
+        r"\bnext year\b": f'in: {year_range(today + relativedelta(years=1))}',
+        r"\bnext yr\b": f'in: {year_range(today + relativedelta(years=1))}',
+        r"\blast year\b": f'in: {year_range(today - relativedelta(years=1))}',
+        r"\blast yr\b": f'in: {year_range(today - relativedelta(years=1))}',
+
+        # Quarters
+        r"\bthis quarter\b": f'in: {quarter_range(today)}',
+        r"\blast quarter\b": f'in: {shift_quarter(today, -1)}',
+        r"\bnext quarter\b": f'in: {shift_quarter(today, 1)}',
+    }
+
+    dynamic_patterns = [
+        (r"\b(last|past)\s+(\d+)\s+days\b", lambda m: f'in: {format_date(today - timedelta(days=int(m.group(2))))}, {format_date(today)}'),
+        (r"\bnext\s+(\d+)\s+days\b", lambda m: f'in: {format_date(today)}, {format_date(today + timedelta(days=int(m.group(1))))}'),
+
+        (r"\b(last|past)\s+(\d+)\s+weeks\b", lambda m: f'in: {format_date(today - timedelta(weeks=int(m.group(2))))}, {format_date(today)}'),
+        (r"\bnext\s+(\d+)\s+weeks\b", lambda m: f'in: {format_date(today)}, {format_date(today + timedelta(weeks=int(m.group(1))))}'),
+
+        (r"\b(last|past)\s+(\d+)\s+months\b", lambda m: f'in: {format_date(today - relativedelta(months=int(m.group(2))))}, {format_date(today)}'),
+        (r"\bnext\s+(\d+)\s+months\b", lambda m: f'in: {format_date(today)}, {format_date(today + relativedelta(months=int(m.group(1))))}'),
+
+        (r"\b(last|past)\s+(\d+)\s+years\b", lambda m: f'in: {format_date(today - relativedelta(years=int(m.group(2))))}, {format_date(today)}'),
+        (r"\bnext\s+(\d+)\s+years\b", lambda m: f'in: {format_date(today)}, {format_date(today + relativedelta(years=int(m.group(1))))}'),
+    ]
+
+    special_ranges = {
+        r"\bstart of this month\b": month_range(today)[0],
+        r"\bend of this month\b": month_range(today)[1],
+        r"\bstart of last month\b": month_range(today - relativedelta(months=1))[0],
+        r"\bend of last month\b": month_range(today - relativedelta(months=1))[1],
+
+        r"\bstart of this week\b": week_range(today)[0],
+        r"\bend of this week\b": week_range(today)[1],
+        r"\bstart of last week\b": week_range(today - timedelta(days=7))[0],
+        r"\bend of last week\b": week_range(today - timedelta(days=7))[1],
+
+        r"\bstart of this year\b": year_range(today)[0],
+        r"\bend of this year\b": year_range(today)[1],
+
+        r"\bstart of this quarter\b": quarter_range(today)[0],
+        r"\bend of this quarter\b": quarter_range(today)[1],
+        r"\bstart of last quarter\b": shift_quarter(today, -1)[0],
+        r"\bend of last quarter\b": shift_quarter(today, -1)[1],
+    }
+
+    for pattern, replacement in replacements.items():
+        query = re.sub(pattern, replacement, query, flags=re.IGNORECASE)
+
+    for pattern, func in dynamic_patterns:
+        query = re.sub(pattern, func, query, flags=re.IGNORECASE)
+
+    for pattern, date_str in special_ranges.items():
+        query = re.sub(pattern, date_str, query, flags=re.IGNORECASE)
+
+    return query
 
 # def preprocess_prompt_multiple_projects(prompt):
 #     """Expands shorthand terms and handles date-related queries before sending to Gemini."""
