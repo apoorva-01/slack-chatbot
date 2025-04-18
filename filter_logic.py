@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -8,6 +9,7 @@ from datetime import datetime
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 
+
 def generate_gemini_parsed_query(user_query):
     field_keys = [
         "project_name", "created_time", "original_due_date", "deployment_date",
@@ -15,59 +17,60 @@ def generate_gemini_parsed_query(user_query):
     ]
 
     allowed_operators = ["equals", "contains", "before", "after", "greater_than", "less_than", "between", "in"]
+    normalized_query = user_query
+    print(f"Normalized query: {normalized_query}")
+
+    current_year = datetime.datetime.now().year
+
+    # Updated system instruction
+    system_instruction = f"""You are an intelligent project query parser.
+
+Your task is to convert natural language queries into structured JSON filters using specific fields and operators.
+
+📌 Rules to follow:
+1. Return only a dictionary with keys from this list: {field_keys}
+2. Use only the following comparison operators: {allowed_operators}
+3. Dates must use `"before"`, `"after"`, `"between"`, or `"in"` with ISO date format (`YYYY-MM-DD`)
+4. Numbers use `"greater_than"`, `"less_than"`, or `"between"`
+5. Text uses `"equals"` or `"contains"`
+6. ❗ If a **date is mentioned without a year**, assume the year is **{current_year}**
+"""
 
     prompt = f"""
-You are an intelligent project query parser.
+{system_instruction}
 
-Your task is to extract **structured filters** from natural language queries about projects. 
-Return a dictionary that uses only the following field keys:
+📚 Field Mapping:
+- "Created Time", "When was it created?", "Created on", "Start date", "Initiated time" → **created_time**
+- "Original Due Date", "Due date", "Deadline", "When was it due?", "Target date" → **original_due_date**
+- "Deployment Date", "Deployment", "Go live", "Launched on", "When will it be live?", "Completed" → **deployment_date**
+- "Total Project Hours", "Total time", "Total hours", "How long overall?", "Entire project time" → **total_hours**
+- "Projected Dev Hours", "Development", "Dev", "Engineering time", "Dev effort", "Build time" → **dev_hours**
+- "Projected QI Hours", "QI", "QA", "Quality inspection", "Testing hours", "Test effort" → **qi_hours**
+- "Details", "Project info", "Overview", "What's it about?", "Description" → **details**
+- "Comments", "Notes", "Updates", "Progress log", "Remarks" → **comments**
 
-{field_keys}
-
-You may use the following comparison operators:
-{allowed_operators}
-
-💡 Guidelines:
-- Dates (e.g., `created_time`, `deployment_date`) must use `"before"`, `"after"`, `"between"`, or `"in"` with ISO date format (`YYYY-MM-DD`).
-- Numbers (e.g., `dev_hours`, `qi_hours`) may use `"greater_than"`, `"less_than"`, `"between"`.
-- Text fields (e.g., `project_name`, `status`, `comments`) use `"equals"` or `"contains"`.
-- If a field uses `"between"` or `"in"`, format it like: `{{"in": ["2025-01-01", "2025-03-01"]}}` or `{{"between": [1, 5]}}`.
-
- **Field Mapping Based on User Queries**
-- **"Created Time", "When was it created?", "Created on", "Start date", "Initiated time"** → **map to**: **Created Time**
-- **"Original Due Date", "Due date", "Deadline", "When was it due?", "Target date"** → **map to**: **Original Due Date**
-- **"Deployment Date", "Deployment", "Go live", "Launched on", "When will it be live?", "Completed"** → **map to**: **Deployment Date**
-- **"Total Project Hours", "Total time", "Total hours", "How long overall?", "Entire project time"** → **map to**: **Total Project Hours**
-- **"Projected Dev Hours", "Development", "Dev", "Engineering time", "Dev effort", "Build time"** → **map to**: **Projected Dev Hours**
-- **"Projected QI Hours", "QI", "QA", "Quality inspection", "Testing hours", "Test effort"** → **map to**: **Projected QI Hours**
-- **"Details", "Project info", "Overview", "What's it about?", "Description"** → **map to**: **Details**
-- **"Comments", "Notes", "Updates", "Progress log", "Remarks"** → **map to**: **Comments**
-
-Example input query:
+🎯 Example input query:
 "Show me all projects deployed after March 1st with more than 2 hours of dev work"
 
-Example output:
+🎯 Example output:
 {{
-  "deployment_date": {{"after": "2025-03-01"}},
-  "dev_hours": {{"greater_than": 2}},
+  "deployment_date": {{"after": "{current_year}-03-01"}},
+  "dev_hours": {{"greater_than": 2}}
 }}
 
 Now parse the following query and return a valid JSON dictionary using these rules:
 
-Query: "{user_query}"
+Query: "{normalized_query}"
 """
-    
 
-    model = genai.GenerativeModel(model_name="gemini-2.0-flash")
+    model = genai.GenerativeModel(model_name="gemini-2.0-flash",system_instruction=system_instruction, tools=[])
     result = model.generate_content(prompt)
     response_text = result.text.strip()
 
-    # Optional: clean up code block formatting
     if response_text.startswith("```json"):
         response_text = response_text.strip("```json").strip("```").strip()
 
     try:
-        
         return json.loads(response_text)
     except Exception:
         return {"raw_response": response_text, "error": "Failed to parse as JSON"}
@@ -278,20 +281,20 @@ def format_multiple_projects_flash_message(projects, parsed_query):
 
     # Map parsed_query keys to display labels and optional suffixes
     field_display_map = {
-        "created_time": ("Created", ""),
-        "original_due_date": ("Due Date", ""),
+        "created_time": ("Created Time", ""),
+        "original_due_date": ("Original Due Date", ""),
         "deployment_date": ("Deployment Date", ""),
         "total_hours": ("Total Project Hours", " hrs"),
         "dev_hours": ("Projected Dev Hours", " hrs"),
         "qi_hours": ("Projected QI Hours", " hrs"),
         "status": ("Status", ""),
-        "project_name": ("Project Name", ""),  # used in title
+        "project_name": ("Project Name", ""),
     }
 
     # Convert camel_case parsed_query keys to the display-friendly fields we care about
     requested_fields = {field_display_map[k][0]: field_display_map[k][1]
                         for k in parsed_query.keys() if k in field_display_map}
-
+    print(f"Requested fields: {requested_fields}")
     messages = []
     for project in projects:
         lines = [f"- :pushpin: *`{project.get('Project Name', 'Unnamed Project')}`*"]
