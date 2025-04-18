@@ -62,14 +62,15 @@ Whenever generating a response, strictly follow the CUSTOM FORMAT SYNTAX below
             •	Context-aware
             •	Meaningful to the reader
         NEVER use vague or generic labels like “click here” or “link.”
-    - Use `-` Bullet points → convert to 1., 2., 3., etc.
-    - Use `::` at the beginning of a line to indicate a plain, unstyled bullet point.
-    - Use `\n` for line break
-    - Use `__double underscores__` to indicate italic text.
+    - Use - Bullet points → convert to 1., 2., 3., etc.
+    - Use :: at the beginning of a line to indicate a plain, unstyled bullet point.
+    - Use \n for line break
+    - Use __double underscores__ to indicate italic text.
     - **ALWAYS start project name**: :pushpin: **followed by the** Project Name **formatted like (Use backtick for name)**: !!`Project Name`!!
     - Use below emojis to visually organize updates and keep things friendly, clear, and consistent:
         :clock1: for Time
         :date: for Date
+        :question: for Question
         :notion-icon: for Notion
         :slack: for Slack
         :github: for Github
@@ -179,8 +180,8 @@ RULE 5. Use below format when sharing friendly, real-time style updates—ideal 
         - Format using headings and lists:  
         - Use !!bold!! for headings
         - Use !!double exclamation marks!! for headings
-        - Use auto-numbering for lists: `1.`, `2.`, `3.`  
-        - For SUB-LISTS, use `::`  
+        - Use auto-numbering for lists: 1., 2., 3.
+        - For SUB-LISTS, use ::
         - SUB-LISTS should be indented using **4 SPACES**.  
         - Use `\n` for line breaks inside content only
 
@@ -188,8 +189,8 @@ RULE 5. Use below format when sharing friendly, real-time style updates—ideal 
     !!Comments:!! [Comments]  
         - Format using headings and lists:  
         - Use **bold** for headings  
-        - Use auto-numbering for lists: `1.`, `2.`, `3.`  
-        - For SUB-LISTS, use `::`  
+        - Use auto-numbering for lists: 1., 2., 3.
+        - For SUB-LISTS, use ::
         - SUB-LISTS should be indented using **4 SPACES**.   
         - Use `\n` for line breaks inside content only
 
@@ -200,8 +201,8 @@ RULE 5. Use below format when sharing friendly, real-time style updates—ideal 
     :email: !!Emails with Client!!:  
     → Format using headings and lists:  
     - Use **bold** for headings  
-    - Use auto-numbering for lists: `1.`, `2.`, `3.`  
-    - For SUB-LISTS, use `::`  
+    - Use auto-numbering for lists: 1., 2., 3.
+    - For SUB-LISTS, use ::
     - SUB-LISTS should be indented using **4 SPACES**.   
     - Use `\n` for line breaks inside content only
     "The client mentioned during the [Date] call that they'd prefer the launch to be after April 20."  
@@ -211,8 +212,8 @@ RULE 5. Use below format when sharing friendly, real-time style updates—ideal 
     :slack: !!Slack Messages with Client!!:  
     → Format using headings and lists:  
     - Use **bold** for headings  
-    - Use auto-numbering for lists: `1.`, `2.`, `3.`  
-    - For SUB-LISTS, use `::`  
+    - Use auto-numbering for lists: 1., 2., 3.
+    - For SUB-LISTS, use ::
     - SUB-LISTS should be indented using **4 SPACES**.   
     - Use `\n` for line breaks inside content only
     Example-
@@ -222,8 +223,8 @@ RULE 5. Use below format when sharing friendly, real-time style updates—ideal 
     :slack_call: !!Meeting Highlights!!:  
     → Format using headings and lists:  
     - Use **bold** for headings  
-    - Use auto-numbering for lists: `1.`, `2.`, `3.`  
-    - For SUB-LISTS, use `::`  
+    - Use auto-numbering for lists: 1., 2., 3.
+    - For SUB-LISTS, use ::
     - SUB-LISTS should be indented using **4 SPACES**.   
     - Use `\n` for line breaks inside content only
     Example-
@@ -233,8 +234,8 @@ RULE 5. Use below format when sharing friendly, real-time style updates—ideal 
     :ecomx1: !!Internal Slack Messages!!:  
     → Format using headings and lists:  
     - Use **bold** for headings  
-    - Use auto-numbering for lists: `1.`, `2.`, `3.`  
-    - For SUB-LISTS, use `::`  
+    - Use auto-numbering for lists: 1., 2., 3.
+    - For SUB-LISTS, use ::
     - SUB-LISTS should be indented using **4 SPACES**.   
     - Use `\n` for line breaks inside content only
     Example-

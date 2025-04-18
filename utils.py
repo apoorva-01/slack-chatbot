@@ -110,7 +110,7 @@ def find_relevant_project_name(query, project_names):
     import re
 
     # Basic stop words to ignore
-    stop_words = {"when", "did", "we", "deploy", "deployed", "the", "to", "of", "on", "in", "for","Hi","hello","hey","there","how","are","you","what","is","this","project","about","can","you","tell","me","more"}
+    stop_words = {"when", "did", "we", "deploy", "deployed", "the", "to", "of", "on", "in", "for","hi","hello","hey","there","how","are","you","what","is","this","project","about","can","you","tell","me","more"}
 
     # Normalize and tokenize
     def tokenize(text):
@@ -253,7 +253,7 @@ def send_slack_response_feedback(slack_client, channel, thread_ts):
         print(f"❌ Slack API Error: {e.response['error']}")
         return None
     
-def send_specefic_project_confirmation_button(slack_client, user_query, assistant_name, channel, thread_ts):
+def send_specific_project_confirmation_button(slack_client, user_query, assistant_name, channel, thread_ts):
     """Handles queries about specific projects."""
     try:
         sheet_id = ASSISTANT_SHEET_MAP[assistant_name.lower()]
