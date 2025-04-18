@@ -1,11 +1,10 @@
 import os
 import re
-import re
 import faiss
 import pickle
 import json
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone
 import google.generativeai as genai
 import google.api_core.exceptions
 from dotenv import load_dotenv
@@ -121,8 +120,6 @@ def get_gemini_embedding_parallel(text_chunks):
 
 
 
-import re
-from datetime import datetime
 
 def parse_numeric_value(value):
     if value.strip().lower() in {"n/a", "na", "n\\a", "n\\/a"}:
@@ -140,14 +137,43 @@ def parse_date(value):
         except ValueError:
             continue
     return None
-    
+
+def infer_status(project):
+    status = project.get("Status")
+    if status:
+        return status
+
+    deployment_date = project.get("Deployment Date")
+    created_time = project.get("Created Time")
+
+    if deployment_date:
+        today = datetime.now(timezone.utc).date()
+        try:
+            dep_date = datetime.strptime(deployment_date[:10], "%Y-%m-%d").date()
+            if dep_date < today:
+                return "✅ Deployed (Not directly mentioned in data, I calculated using dates provided)"
+            else:
+                return "⌛ In Progress (Not directly mentioned in data, I calculated using dates provided)"
+        except:
+            return "❓ Unknown"
+
+    if created_time:
+        return "🚫 Not Started (Not directly mentioned in data, I calculated using dates provided)"
+
+    return "❓ Unknown"
+
+def finalize_comments(comment_lines):
+    text = "\n".join(comment_lines).strip()
+    if "no comments available" in text.lower() or not text:
+        return None
+    return text
+
 def parse_project_data(doc_text):
     projects = []
     current_project = {}
     comment_lines = []
     in_comments_section = False
 
-    # Regex to detect field starts
     field_starts = re.compile(
         r"^(Project Name|Status|Created Time|Original Due Date|Deployment Date|Total Project Hours|Projected Dev Hours|Projected QI Hours|Details):"
     )
@@ -158,18 +184,13 @@ def parse_project_data(doc_text):
     while i < len(lines):
         line = lines[i].strip()
 
-        # Handle "Project Name"
         if line.startswith("Project Name:"):
             if current_project and current_project.get("Project Name"):
-                # Finalize previous project
-                comments_text = "\n".join(comment_lines).strip()
-                if "no comments available" in comments_text.lower() or not comments_text:
-                    current_project["Comments"] = None
-                else:
-                    current_project["Comments"] = comments_text
-                comment_lines = []
+                current_project["Comments"] = finalize_comments(comment_lines)
+                current_project["Status"] = infer_status(current_project)
                 projects.append(current_project)
                 current_project = {}
+                comment_lines = []
                 in_comments_section = False
             current_project["Project Name"] = line.split(":", 1)[1].strip()
 
@@ -177,16 +198,19 @@ def parse_project_data(doc_text):
             current_project["Status"] = line.split(":", 1)[1].strip()
 
         elif line.startswith("Created Time:"):
-            created_time = line.split(":", 1)[1].strip()
-            current_project["Created Time"] = parse_date(created_time).isoformat() if parse_date(created_time) else None
+            value = line.split(":", 1)[1].strip()
+            dt = parse_date(value)
+            current_project["Created Time"] = dt.isoformat() if dt else None
 
         elif line.startswith("Original Due Date:"):
-            original_due_date = line.split(":", 1)[1].strip()
-            current_project["Original Due Date"] = parse_date(original_due_date).isoformat() if parse_date(original_due_date) else None
+            value = line.split(":", 1)[1].strip()
+            dt = parse_date(value)
+            current_project["Original Due Date"] = dt.isoformat() if dt else None
 
         elif line.startswith("Deployment Date:"):
-            deployment_date = line.split(":", 1)[1].strip()
-            current_project["Deployment Date"] = parse_date(deployment_date).isoformat() if parse_date(deployment_date) else None
+            value = line.split(":", 1)[1].strip()
+            dt = parse_date(value)
+            current_project["Deployment Date"] = dt.isoformat() if dt else None
 
         elif line.startswith("Total Project Hours:"):
             value = line.split(":", 1)[1].strip()
@@ -211,10 +235,7 @@ def parse_project_data(doc_text):
                 details_lines.append(next_line)
                 i += 1
             details = "\n".join(details_lines).strip()
-            if details == "---------------------------------------------------------------------":
-                current_project["Details"] = None
-            else:
-                current_project["Details"] = details
+            current_project["Details"] = None if details == "---------------------------------------------------------------------" else details
 
         elif line.startswith("Task:"):
             current_project["Task"] = line.split(":", 1)[1].strip()
@@ -238,13 +259,10 @@ def parse_project_data(doc_text):
 
         i += 1
 
-    # Add the last project
+    # Final project block
     if current_project.get("Project Name"):
-        comments_text = "\n".join(comment_lines).strip()
-        if "no comments available" in comments_text.lower() or not comments_text:
-            current_project["Comments"] = None
-        else:
-            current_project["Comments"] = comments_text
+        current_project["Comments"] = finalize_comments(comment_lines)
+        current_project["Status"] = infer_status(current_project)
         projects.append(current_project)
 
     return projects

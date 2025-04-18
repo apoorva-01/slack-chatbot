@@ -9,6 +9,7 @@ from utils import (
     get_thread_metadata,
     store_thread_metadata,
     extract_assistant_from_channel_name,
+    clean_slack_formatting,
     get_channel_name,
     send_slack_response,
     send_clarification_buttons,
@@ -64,19 +65,19 @@ def generate_final_response(user_query, is_follow_up, thread_context, thread_mes
         result = None
         print("is_follow_up", is_follow_up)
         if query_type == "multiple_projects":
-            if not is_follow_up:
-                # First message in thread → always try filtering
+            #  classify query intent
+            if classify_multiple_projects_query_intent(user_query):
+                print("🔎 Classified as filtering query")
                 result = generate_custom_filter_response(user_query, notion_chunks)
             else:
-                # Follow-up → classify query intent
-                if classify_multiple_projects_query_intent(user_query):
-                    print("🔎 Classified as filtering query")
-                    result = generate_custom_filter_response(user_query, notion_chunks)
-                else:
-                    print("💬 Classified as non-filtering query")
+                print("💬 Classified as non-filtering query")
+                user_query_with_project_context = user_query
+                if is_follow_up and len(multiple_projects_array)>0:
                     user_query_with_project_context = f"""{user_query}
 - Use projects in {multiple_projects_array} to answer the user query, unless a project name is explicitly entered."""
-                    result = generate_gemini_response(
+                
+                print(user_query_with_project_context,"user_query_with_project_context")
+                result = generate_gemini_response(
                         query_type, user_query_with_project_context, thread_messages, notion_chunks, hubspot_chunks,
                         raw_messages_chunks, transcript_chunks, faq_chunks,
                         internal_slack_messages_chunks, project_name, multiple_projects_array
@@ -230,7 +231,7 @@ def slack_events():
                 channel = event["channel"]
                 thread_ts = event.get("thread_ts", event.get("ts"))
                 user_slack_id =  event["user"]
-                user_query = event["text"].replace(f"<@{SLACK_BOT_USER_ID}>", "").strip()
+                user_query = clean_slack_formatting(event["text"].replace(f"<@{SLACK_BOT_USER_ID}>", "").strip())
                 thread_context = get_thread_messages(slack_client, channel, thread_ts)
                 threading.Thread(target=handle_slack_actions, args=(user_query, channel, thread_ts, thread_context, user_slack_id)).start()
 

@@ -9,6 +9,7 @@ from dateutil.relativedelta import relativedelta
 # from datetime import datetime
 import threading
 from dotenv import load_dotenv
+import html
 
 from document_ids import (
     ASSISTANT_SHEET_MAP
@@ -129,6 +130,23 @@ def fetch_google_sheet_data(sheet_id, range_name, google_credentials):
     except Exception as e:
         print(f"❌ Google Sheets API Error: {e}")
         return []
+
+def clean_slack_formatting(text):
+    # Unescape HTML entities
+    text = html.unescape(text)
+
+    # Remove Slack markdown styles
+    text = re.sub(r'[_*~`]', '', text)  # _italic_, *bold*, ~strike~, `code`
+    text = re.sub(r'<[^>|]+(\|([^>]+))?>', lambda m: m.group(2) if m.group(2) else '', text)  # <url|text>, <mailto:>
+    text = re.sub(r':[a-zA-Z0-9_+-]+:', '', text)  # :emoji:
+
+    # Remove extra symbols like smart quotes or backticks
+    text = re.sub(r'[“”‘’´`]', '', text)
+
+    # Collapse multiple spaces
+    text = re.sub(r'\s+', ' ', text).strip()
+
+    return text
 
 def get_channel_name(channel_id, slack_client):
     """Fetches the channel name from the Slack API."""
@@ -310,6 +328,7 @@ def strip_json_wrapper(text):
 
 def preprocess_relative_dates(query):
     today = datetime.today()
+    query = clean_slack_formatting(query)
 
     def format_date(date_obj):
         return date_obj.strftime('%Y-%m-%d')
