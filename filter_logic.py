@@ -16,7 +16,7 @@ genai.configure(api_key=GEMINI_API_KEY)
 def generate_gemini_parsed_query(user_query):
     field_keys = [
         "project_name", "created_time", "original_due_date", "deployment_date",
-        "total_hours", "dev_hours", "qi_hours", "details", "comments"
+        "total_hours", "dev_hours", "qi_hours", "comments", "status"
     ]
 
     allowed_operators = ["equals", "contains", "before", "after", "greater_than", "less_than", "between", "in","not_equals", "not_contains"]
@@ -37,6 +37,8 @@ Your task is to convert natural language queries into structured JSON filters us
 4. Numbers use `"greater_than"`, `"less_than"`, or `"between"`
 5. Text uses `"equals"` or `"contains"`
 6. ❗ If a **date is mentioned without a year**, assume the year is **{current_year}**
+7. The `"status"` field must always use the `"contains"` operator and only include values from this list:
+    - ["Project Setup", "Designer Review", "Lead Dev Review", "AM Review", "Ready To Start", "In Progress", "Pause", "Code Review", "Quality Inspection", "Issues Found", "Dev Fixing Issues", "Need Support", "Ready For Client", "Client Is Reviewing", "Prep for Deployment", "Deployment", "Ready to Deploy", "Done", "Archive", "Design Revision", "Deployed", "Not Started", "Unknown"]
 """
 
     prompt = f"""
@@ -44,8 +46,9 @@ Your task is to convert natural language queries into structured JSON filters us
 
 ### Field Mapping:
 - "Created Time", "When was it created?", "Created on", "Start date", "Initiated time" → **created_time**
+- "status of project" - **status**
 - "Original Due Date", "Due date", "Deadline", "When was it due?", "Target date" → **original_due_date**
-- "Deployment Date", "Deployment", "Go live", "Launched on", "When will it be live?", "Completed" → **deployment_date**
+- "Done","Deployment Date", "Deployment", "Go live", "Launched on", "When will it be live?", "Completed" → **deployment_date**
 - "Total Project Hours", "Total time", "Total hours", "How long overall?", "Entire project time" → **total_hours**
 - "Projected Dev Hours", "Development", "Dev", "Engineering time", "Dev effort", "Build time" → **dev_hours**
 - "Projected QI Hours", "QI", "QA", "Quality inspection", "Testing hours", "Test effort" → **qi_hours**
@@ -68,6 +71,13 @@ Example output:
   "deployment_date": {{"in": ["{current_year}-03-01","{current_year}-03-31"]}}
   }}
 
+Example input query:
+"List of all projects in Pause Status"
+Example output:
+{{
+  "status": {{"contains": ["Pause"]}}
+}}
+
 Now parse the following query and return a valid JSON dictionary using these rules:
 
 Query: "{normalized_query}"
@@ -84,7 +94,8 @@ Query: "{normalized_query}"
         return json.loads(response_text)
     except Exception:
         return {"raw_response": response_text, "error": "Failed to parse as JSON"}
-    
+
+
 def convert_parsed_query_to_filter(parsed_query):
     filters = []
     print(f"Parsed query: {parsed_query}")
@@ -99,6 +110,16 @@ def convert_parsed_query_to_filter(parsed_query):
         filters.append({
             "property": "Project Name",
             "rich_text": {"project_match": match_value}
+        })
+    if "status" in parsed_query:
+        match_value = parsed_query["status"]
+        if isinstance(match_value, dict) and "equals" in match_value:
+            match_value = match_value["equals"]
+        if isinstance(match_value, dict) and "contains" in match_value:
+            match_value = match_value["contains"]
+        filters.append({
+            "property": "Status",
+            "select": {"status_match": match_value}
         })
     # Mapping of fields to their Notion properties and types
     field_map = {
@@ -115,7 +136,7 @@ def convert_parsed_query_to_filter(parsed_query):
     }
 
     for key, (notion_prop, notion_type) in field_map.items():
-        if key not in parsed_query or key == "project_name":
+        if key not in parsed_query or key == "project_name" or key == "status_match":
             continue  # Skip if key not present OR it's already handled
 
         value = parsed_query[key]
@@ -133,11 +154,11 @@ def convert_parsed_query_to_filter(parsed_query):
                     "number": {"equals": value}
                 })
 
-        elif notion_type == "select":
-            filters.append({
-                "property": notion_prop,
-                "select": {"equals": value}
-            })
+        # elif notion_type == "select":
+        #     filters.append({
+        #         "property": notion_prop,
+        #         "select": {"equals": value}
+        #     })
 
         elif notion_type == "date":
             if isinstance(value, dict):
@@ -242,6 +263,8 @@ def query_notion_projects(filters, all_projects_data):
                         return False
                 elif op == "project_match":
                     return findMatches(value, target)
+                elif op == "status_match":
+                    return findStatusMatches(value, target)
         return True
 
     def project_matches(project, conditions):
@@ -260,32 +283,22 @@ def query_notion_projects(filters, all_projects_data):
     ]
     return matching_projects
 
-def infer_status(project):
-    status = project.get("Status")
-    if status:
-        return status
+def findStatusMatches(value, target):
+    if not value:
+        return False
 
-    # Inference fallback based on Deployment Date
-    deployment_date = project.get("Deployment Date")
-    created_time = project.get("Created Time")
+    value = value.lower()
 
-    if deployment_date:
-        from datetime import datetime
-        today = datetime.utcnow().date()
+    if isinstance(target, str):
+        return target.lower() in value or value in target.lower()
 
-        try:
-            dep_date = datetime.strptime(deployment_date[:10], "%Y-%m-%d").date()
-            if dep_date < today:
-                return "✅ Deployed (inferred)"
-            else:
-                return "⌛ In Progress (inferred)"
-        except:
-            return "❓ Unknown"
+    elif isinstance(target, list):
+        return any(
+            t.lower() in value or value in t.lower()
+            for t in target if isinstance(t, str)
+        )
 
-    if created_time:
-        return "🚫 Not Started (inferred)"
-
-    return "❓ Unknown"
+    return False
 
 def findMatches(value,target):
     import re
@@ -346,7 +359,7 @@ def format_multiple_projects_flash_message(projects, parsed_query):
     # Convert camel_case parsed_query keys to the display-friendly fields we care about
     requested_fields = {field_display_map[k][0]: field_display_map[k][1]
                         for k in parsed_query.keys() if k in field_display_map}
-    print(f"Requested fields: {requested_fields}")
+    # print(f"Requested fields: {requested_fields}")
     messages = []
     for project in projects:
         lines = [f"- :pushpin: *`{project.get('Project Name', 'Unnamed Project')}`*"]

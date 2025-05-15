@@ -159,15 +159,16 @@ def get_channel_name(channel_id, slack_client):
     return None
 
 def extract_assistant_from_channel_name(channel_name, available_assistants):
-    """Extracts the base client name (e.g., 'voluspa') from the channel name."""
+    """Extracts the base client name from the channel name based on available assistants."""
     normalized_channel = channel_name.lower().replace('-', '_')
-    channel_words = set(normalized_channel.split('_'))
-    # Extract base client names from assistant list (e.g., 'voluspa' from 'voluspa_notion')
-    client_basenames = {a.split('_')[0].lower() for a in available_assistants}
 
-    for word in channel_words:
-        if word in client_basenames:
-            return word
+    # Extract full base name like 'shes-birdie' from 'shes-birdie_notion'
+    client_basenames = {a.rsplit('_', 1)[0].lower() for a in available_assistants}
+
+    for base in client_basenames:
+        if base.replace('-', '_') in normalized_channel:
+            return base
+    return None
     # Fallback: partial match
     # for base_name in client_basenames:
     #     if base_name in normalized_channel:

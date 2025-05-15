@@ -321,7 +321,7 @@ You will receive the full json of project details under the block:
 - **"Projected Dev Hours", "Development", "Dev", "Engineering time", "Dev effort", "Build time"** → **map to**: **Projected Dev Hours**
 - **"Projected QI Hours", "QI", "QA", "Quality inspection", "Testing hours", "Test effort"** → **map to**: **Projected QI Hours**
 - **"Details", "Project info", "Overview", "What's it about?", "Description"** → **map to**: **Details**
-- **"Comments", "Notes", "Updates", "Progress log", "Remarks"** → **map to**: **Comments**
+- **"Comments", "Progress log", "Remarks"** → **map to**: **Comments**
 
 ---
 

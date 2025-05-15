@@ -33,6 +33,11 @@ def classify_multiple_projects_query_intent(user_query):
     Examples of non-filtering queries:
     - Summarize updates for this project.
     - What are the key blockers for projects?
+    - Provide a summary of the last meeting.
+    - What are the main issues with the project?
+    - give details of all the call meetings we have
+    - What are the main takeaways from the last meeting?
+    - Give all related slack messages
     - How are clients responding?
     - What’s the overall sentiment?
 

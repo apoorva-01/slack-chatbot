@@ -195,7 +195,9 @@ def parse_project_data(doc_text):
             current_project["Project Name"] = line.split(":", 1)[1].strip()
 
         elif line.startswith("Status:"):
-            current_project["Status"] = line.split(":", 1)[1].strip()
+            value = line.split(":", 1)[1].strip()
+            if value:
+                current_project["Status"] = value
 
         elif line.startswith("Created Time:"):
             value = line.split(":", 1)[1].strip()
@@ -262,7 +264,8 @@ def parse_project_data(doc_text):
     # Final project block
     if current_project.get("Project Name"):
         current_project["Comments"] = finalize_comments(comment_lines)
-        current_project["Status"] = infer_status(current_project)
+        if not current_project.get("Status"):
+            current_project["Status"] = infer_status(current_project)
         projects.append(current_project)
 
     return projects

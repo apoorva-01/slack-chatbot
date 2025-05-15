@@ -30,6 +30,7 @@ ASSISTANT_SHEET_MAP = {
     "choczero":"1ZmCS7kLk7nNCJ4VVNEridof7Jb31I9uCHSBgcoPIZYY",
     "seekinghealth":"1rkd-jdw9ywDAfS8_hfOw0Kb-g4lNRIbJ9z51JTkcZBY",
     "chefiq":"1NRQWiOrkUybzHifhjV6-yysV5Ud4RhFLCqEu5QC-K50",
+    "oregon-freeze-dry":"1osBMgE9zecz6hQQS9BYAJeXlP4KUAAMSSFykpcOWaAE"
 }
 notion_documents = [
       {"clientName": "voluspa", "docId": "1KjyTZk1suvDlarlLSmNXQbE2JhlabDGhMPs7gFay_Kg"},
@@ -95,20 +96,11 @@ hubspot_documents = [
     {"clientName": "createroom", "docId": "1OBNLVmPObPbOmr2SaOgYIRbrIvyf0Iv2-DAe2DbsvXs"},
     {"clientName": "choczero", "docId": "1XXwxTdiqJ61mKdRDc-797iO1xu2dyGrlQyvLRgxaDa8"},
     {"clientName": "seekinghealth", "docId": "1uEDVWG5Bxnil1LlDhEzX9CU_hCQUdd_2m4hkpn7b1bQ"},
-    {"clientName": "javier", "docId": "1wbolZI-4j3J4K38bfSOqd-7FcMYo2KYp1S8a2L-0m6A"},
     {"clientName": "ivycityco", "docId": "1cOJleDc1SF2nlmQS6hPVUn6lIXrRnZ4KTX6ygtrn-2o"},
     {"clientName": "chefiq", "docId": "1n2bm7R8ktF_J2WQdbM7t3nT0MA7S0QEKiJLH6q6nsnA"},
-    {"clientName": "duck-camp", "docId": "1XNzVS9-biKS-CeWdENCnkl6n4OEDoVGlqhcQzzbnnvQ"},
-    {"clientName": "emazing-group", "docId": "19EalaZPLEz5-pEx8wg68ygGc9menjOt3Pz0TnJGDr_M"},
-    {"clientName": "inprintwetrustt", "docId": "1_b6v78ONtKupGYD5e8yZUHYAxyjPwQzCoL1kRco46yU"},
-    {"clientName": "florida-premium-beef", "docId": "1JkIRDsqm_--sp-phaHea2M7uJ2HJMf-KGWhJGianS8c"},
-    {"clientName": "warroad", "docId": "1g5xYCuJ6SCL8P-CGd1428RFqrpxTAiLaLyWj4geLcjM"},
-    {"clientName": "tailwind-nutrition", "docId": "1eeItg3vkKvC8eFVUr8gR8t55Y32GAdjFYbfQyCZQ83A"},
-    {"clientName": "printfresh", "docId": "1WpEXv_IjonnrB7SzzQkiB3ZtGpAzOmKODHqfjOxqSZM"},
     {"clientName": "javier", "docId": "1ZB5HlvQPLWJjnTAqF7B0wqcsdNOexwtFU_HwEKtiVzI"},
     {"clientName": "ivycityco", "docId": "1IFVUaQdbyHCIsrsJnDP4DRNvzm6upGSMOOu7LXcqheA"},
-    {"clientName": "chefiq", "docId": "1n2bm7R8ktF_J2WQdbM7t3nT0MA7S0QEKiJLH6q6nsnA"},
-
+    {"clientName": "oregon-freeze-dry", "docId": "1SxCOIcakQdVywQ8OFKnpzB191iCWoewNyxlnX72CJHY"},
 
     ]
 raw_messages_documents = [
@@ -161,6 +153,8 @@ transcript_documents = [
     {"clientName": "createroom", "docId": "1i_oJ21menQ4sKYySicjCHrYMFgbzBZ-VpcSvY_jxm6Q"},
     {"clientName": "choczero", "docId": "18bcIqEaIdEsWIM2H9ho6yoJU3TuoSf5V2gNtY5RWQrY"},
     {"clientName": "seekinghealth", "docId": "1UJz_3Dac4TP7aorvc66ytaS2grG2-7jVROoNT94Yd64"},
+    {"clientName": "javier", "docId": "1wbolZI-4j3J4K38bfSOqd-7FcMYo2KYp1S8a2L-0m6A"},
+
     ]
 
 faq_documents = [
